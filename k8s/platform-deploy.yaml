@@ -15,3 +15,8 @@ spec:
       containers:
         - name: platformservice
           image: abdelazizshaban0/platformservice:latest
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+          ports:
+            - containerPort: 8080
