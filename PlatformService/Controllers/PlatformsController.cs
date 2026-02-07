@@ -1,5 +1,7 @@
+using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
+using platformservice.SyncDataServices.Http;
 using PlatformService.Data;
 using PlatformService.Dtos;
 using PlatformService.Models;
@@ -13,12 +15,13 @@ public class PlatformsController : ControllerBase
     private readonly IPlatformRepo _repository;
     private readonly IMapper _mapper;
     private readonly ILogger<PlatformsController> _logger;
-
-    public PlatformsController(IPlatformRepo repository, IMapper mapper, ILogger<PlatformsController> logger)
+    private readonly ICommandDataClient _commandDataClient;
+    public PlatformsController(IPlatformRepo repository, IMapper mapper, ILogger<PlatformsController> logger, ICommandDataClient commandDataClient)
     {
         _repository = repository;
         _mapper = mapper;
         _logger = logger;
+        _commandDataClient = commandDataClient;
     }
 
     [HttpGet]
@@ -42,7 +45,7 @@ public class PlatformsController : ControllerBase
     }
 
     [HttpPost]
-    public ActionResult<PlatformReadDto> CreatePlatform(PlatformCreateDto platformCreateDto)
+    public async Task<ActionResult<PlatformReadDto>> CreatePlatform(PlatformCreateDto platformCreateDto)
     {
         _logger.LogInformation("Creating new platform");
         var platform = _mapper.Map<Platform>(platformCreateDto);
@@ -50,6 +53,17 @@ public class PlatformsController : ControllerBase
         _repository.SaveChanges();
 
         var platformReadDto = _mapper.Map<PlatformReadDto>(platform);
+
+        // Send Sync Message
+        try
+        {
+          await  _commandDataClient.SendPlatformToCommand(platformReadDto);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Could not send synchronously to CommandService: {ex.Message}");
+        }
+
         return CreatedAtRoute(nameof(GetPlatformById), new { id = platformReadDto.Id }, platformReadDto);
     }
 }
